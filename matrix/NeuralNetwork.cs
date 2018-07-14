@@ -166,7 +166,7 @@ namespace NeuralNetwork
     /// </summary>
     /// <typeparam name="Tensor">输出输出数据的类型,现只支持Matrix</typeparam>
     /// <typeparam name="LayerWB">神经网络中权重和偏置的类型,现只支持Matrix</typeparam>
-    public class Network<Tensor, LayerWB> where Tensor : Matrix
+    public class Network<Tensor, LayerWB> where Tensor : Matrix where LayerWB : Matrix
     {
         private Dictionary<string, Layer<Tensor, LayerWB>> Structure;
 
@@ -201,7 +201,7 @@ namespace NeuralNetwork
                 la.LayerNumber = i;
                 link = la.LinkLayerName;
             }
-            Output.LayerNumber = Structure.Count;
+            Output.LayerNumber = Structure.Count-1;
         }
 
         /// <summary>
@@ -248,7 +248,7 @@ namespace NeuralNetwork
         public Layer<Tensor, LayerWB> FindLayerBynum(int LayerNumber)
         {
             string link = "Input";
-            for (int i = 0; i < Structure.Count - 1; i++)
+            for (int i = 0; i < Structure.Count; i++)
             {
                 Layer<Tensor, LayerWB> la = Structure[link];
                 if (la.LayerNumber == LayerNumber)
@@ -263,9 +263,8 @@ namespace NeuralNetwork
         /// </summary>
         /// <param name="XData">输入数据</param>
         /// <param name="YData">输出数据</param>
-        /// <param name="trainSetup">训练次数</param>
         /// <param name="isShow">是否显示过程</param>
-        public void Train(Tensor XData, Tensor YData, int trainSetup, bool isShow = true)
+        public void Train(Tensor XData, Tensor YData, bool isShow = true)
         {
             List<Tensor> tensors = new List<Tensor>() { XData };
             string link = "Input";
@@ -281,24 +280,60 @@ namespace NeuralNetwork
             float loss = Function.Mean(Out);
             Console.WriteLine("loss:" + loss);
 
-            Matrix Dloss = tensors[tensors.Count - 1];
-            Function.Sub(ref Dloss, YData);
-            Function.Multiply(ref Dloss, 2);
 
+            Matrix pian = tensors[tensors.Count - 1];
+            Function.Sub(ref pian, YData);
+            Function.Multiply(ref pian, 2);
+            
+            for (int i = Structure.Count-2; i >= 0; i--)
+            {
+                Layer<Tensor, LayerWB> thislayaer = FindLayerBynum(i);
+                if (thislayaer.Name == "Input")
+                    break;
+                Layer<Tensor, LayerWB> lastlayaer = FindLayerBynum(i-1);
 
-            Tensor Dlayer = RunForVariable(XData, Structure.Count - 2);
-            Tensor Dzl = Dlayer;
-            Dlayer = FindLayerBynum(Structure.Count - 1).FunctionNoAF(Dlayer);
-            Dlayer.Derivatives(FindLayerBynum(Structure.Count - 1).ActivationFunction);
+                Tensor Dlayer = tensors[i-1];
+                Tensor Dzl = Dlayer;
+                Dlayer = thislayaer.FunctionNoAF(Dlayer);
+                if (thislayaer.ActivationFunction != null)
+                    Dlayer.Derivatives(FindLayerBynum(i).ActivationFunction);
 
+                Matrix offset_w = pian;
+                Function.Multiply(ref offset_w, Dlayer);
+                Matrix offset_b = offset_w;
+                float of_b = Function.AddAll(offset_b);
+                Matrix offset_ll = offset_b;
+                Function.Multiply(ref offset_w, Dzl);
+                Matrix w = thislayaer.Weight;
+                Matrix b = thislayaer.Bias;
+                Matrix ll = tensors[i-1];
+                offset_ll = w * offset_ll;
+                float of_w = Function.AddAll(offset_w);
+                float of_ll = Function.AddAll(offset_ll);
 
+                Function.Add(ref w, of_w);
+                Function.Add(ref b, of_b);
+                Function.Add(ref ll, of_ll);
+                thislayaer.Weight = (LayerWB)w;
+                thislayaer.Bias = (LayerWB)b;
+                Function.Multiply(ref ll, 2);
+                pian = ll;
+            }
 
+        }
 
-            //for (int i = tensors.Count; i >= 0; i--)
-            //{
-            //    tensors[i]
-            //}
-
+        public override string ToString()
+        {
+            string s = "";
+            string link = "Input";
+            for (int i = 0; i < Structure.Count; i++)
+            {
+                Layer<Tensor, LayerWB> la = Structure[link];
+                s+= string.Format("LayerName:{0}\tLayerNum:{1}\tLinkLayer:{2}",la.Name,la.LayerNumber,la.LinkLayerName);
+                s += "\n";
+                link = la.LinkLayerName;
+            }
+            return s;
         }
     }
 

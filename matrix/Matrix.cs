@@ -187,6 +187,14 @@ namespace matrix
                 for (int j = 0; j < v.yLength; j++)
                     v.vMatrix[i, j] *= n;
         }
+        public static void Multiply(ref Matrix v, Matrix n)
+        {
+            if (v.xLength != n.xLength || v.yLength != n.yLength)
+                throw new Exception("无法将矩阵相乘");
+            for (int i = 0; i < v.xLength; i++)
+                for (int j = 0; j < v.yLength; j++)
+                    v.vMatrix[i, j] *= n.vMatrix[i,j];
+        }
         public static void Add(ref Matrix lhs, Matrix rhs)
         {
             if (lhs.xLength != rhs.xLength || lhs.yLength != rhs.yLength)
@@ -200,6 +208,13 @@ namespace matrix
             for (int i = 0; i < lhs.xLength; i++)
                 for (int j = 0; j < lhs.yLength; j++)
                     lhs.vMatrix[i, j] += rhs;
+        }
+        public static float AddAll(Matrix lhs)
+        {
+            float sum = 0;
+            foreach (var item in lhs)
+                sum += item;
+            return sum;
         }
         public static void Sub(ref Matrix lhs, Matrix rhs)
         {
