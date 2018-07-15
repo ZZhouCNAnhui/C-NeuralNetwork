@@ -264,7 +264,7 @@ namespace NeuralNetwork
         /// <param name="XData">输入数据</param>
         /// <param name="YData">输出数据</param>
         /// <param name="isShow">是否显示过程</param>
-        public void Train(Tensor XData, Tensor YData, bool isShow = true)
+        public void Train(Tensor XData, Tensor YData, float learn=0.05f,bool isShow = true)
         {
             List<Tensor> tensors = new List<Tensor>() { XData };
             string link = "Input";
@@ -291,29 +291,39 @@ namespace NeuralNetwork
                 if (thislayaer.Name == "Input")
                     break;
                 Layer<Tensor, LayerWB> lastlayaer = FindLayerBynum(i-1);
+                Tensor Dzl = tensors[i-1];
+                Tensor Dlayer = Dzl;
 
-                Tensor Dlayer = tensors[i-1];
-                Tensor Dzl = Dlayer;
-                Dlayer = thislayaer.FunctionNoAF(Dlayer);
+                Dzl = thislayaer.FunctionNoAF(Dzl);
                 if (thislayaer.ActivationFunction != null)
-                    Dlayer.Derivatives(FindLayerBynum(i).ActivationFunction);
+                    Dzl.Derivatives(FindLayerBynum(i).ActivationFunction);
+                else
+                    Dzl.Foreach(a => { return 1; });
+
+                LayerWB dw = thislayaer.Weight;
 
                 Matrix offset_w = pian;
-                Function.Multiply(ref offset_w, Dlayer);
-                Matrix offset_b = offset_w;
-                float of_b = Function.AddAll(offset_b);
-                Matrix offset_ll = offset_b;
                 Function.Multiply(ref offset_w, Dzl);
+                Function.Multiply(ref offset_w, Dlayer);
+
+                Matrix offset_b = pian;
+                Function.Multiply(ref offset_b, Dzl);
+
+                Matrix offset_ll = offset_b;
+                offset_ll = dw * offset_ll;
+
+                Function.Multiply(ref offset_w, learn);
+                Function.Multiply(ref offset_b, learn);
+                Function.Multiply(ref offset_ll, learn);
+
                 Matrix w = thislayaer.Weight;
                 Matrix b = thislayaer.Bias;
                 Matrix ll = tensors[i-1];
-                offset_ll = w * offset_ll;
-                float of_w = Function.AddAll(offset_w);
-                float of_ll = Function.AddAll(offset_ll);
 
-                Function.Add(ref w, of_w);
-                Function.Add(ref b, of_b);
-                Function.Add(ref ll, of_ll);
+                Function.Sub(ref w, offset_w);
+                Function.Sub(ref b, offset_b);
+                Function.Sub(ref ll, offset_ll);
+
                 thislayaer.Weight = (LayerWB)w;
                 thislayaer.Bias = (LayerWB)b;
                 Function.Multiply(ref ll, 2);

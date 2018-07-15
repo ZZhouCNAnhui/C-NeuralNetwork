@@ -75,6 +75,16 @@ namespace matrix
             matrix = Newmatrix;
 
         }
+        public Matrix Clone()
+        {
+            Matrix re = new Matrix(xLength, yLength, 0);
+            
+            for (int i = 0; i < xLength; i++)
+                for (int j = 0; j < yLength; j++)
+                    re.vMatrix[i, j] = vMatrix[i, j];
+            return re;
+        }
+
         public override string ToString()
         {
             string s = "[";
@@ -148,10 +158,18 @@ namespace matrix
         {
             if (lhs.yLength != rhs.yLength || rhs.xLength != 1)
                 throw new Exception("无法将矩阵相加");
-            Matrix re = lhs;
+            Matrix re = new Matrix(rhs.xLength, rhs.yLength,0);
             for (int i = 0; i < re.xLength; i++)
                 for (int j = 0; j < re.yLength; j++)
-                    re.matrix[i, j] += rhs.matrix[0, j];
+                    re.matrix[i, j] = rhs.matrix[0, j]+lhs.vMatrix[i,j];
+            return re;
+        }
+        public static Matrix operator +(Matrix lhs, float rhs)
+        {
+            Matrix re = new Matrix(lhs.xLength, lhs.yLength, 0);
+            for (int i = 0; i < re.xLength; i++)
+                for (int j = 0; j < re.yLength; j++)
+                    re.matrix[i, j] = lhs.vMatrix[i, j] + rhs;
             return re;
         }
         public static Matrix operator *(Matrix lhs, Matrix rhs)
@@ -175,6 +193,14 @@ namespace matrix
             }
             return re;
         }
+        public static Matrix operator *(Matrix lhs, float rhs)
+        {
+            Matrix re = new Matrix(lhs.xLength, lhs.yLength, 0);
+            for (int i = 0; i < lhs.xLength; i++)
+                for (int j = 0; j < lhs.yLength; j++)
+                    re.vMatrix[i, j] = rhs * lhs.vMatrix[i,j];
+            return re;
+        }
 
     }
 
@@ -195,19 +221,56 @@ namespace matrix
                 for (int j = 0; j < v.yLength; j++)
                     v.vMatrix[i, j] *= n.vMatrix[i,j];
         }
-        public static void Add(ref Matrix lhs, Matrix rhs)
+        public static Matrix Multiply(Matrix v, float n)
         {
-            if (lhs.xLength != rhs.xLength || lhs.yLength != rhs.yLength)
-                throw new Exception("无法将矩阵相加");
-            for (int i = 0; i < lhs.xLength; i++)
-                for (int j = 0; j < lhs.yLength; j++)
-                    lhs.vMatrix[i, j] += rhs.vMatrix[i, j];
+            Matrix re = new Matrix(v.xLength, v.yLength, 0);
+            for (int i = 0; i < re.xLength; i++)
+                for (int j = 0; j < re.yLength; j++)
+                    re.vMatrix[i, j] = n * v.vMatrix[i,j];
+            return re;
         }
-        public static void Add(ref Matrix lhs, float rhs)
+        public static Matrix Multiply(Matrix v, Matrix n)
         {
-            for (int i = 0; i < lhs.xLength; i++)
-                for (int j = 0; j < lhs.yLength; j++)
-                    lhs.vMatrix[i, j] += rhs;
+            if (v.xLength != n.xLength || v.yLength != n.yLength)
+                throw new Exception("无法将矩阵相乘");
+            Matrix re = new Matrix(v.xLength, v.yLength, 0);
+            for (int i = 0; i < v.xLength; i++)
+                for (int j = 0; j < v.yLength; j++)
+                    re.vMatrix[i,j] = v.vMatrix[i, j] * n.vMatrix[i, j];
+            return re;
+        }
+
+        public static void Add(ref Matrix m, Matrix v)
+        {
+            if (m.xLength != v.xLength || m.yLength != v.yLength)
+                throw new Exception("无法将矩阵相加");
+            for (int i = 0; i < m.xLength; i++)
+                for (int j = 0; j < m.yLength; j++)
+                    m.vMatrix[i, j] += v.vMatrix[i, j];
+        }
+        public static void Add(ref Matrix v, float n)
+        {
+            for (int i = 0; i < v.xLength; i++)
+                for (int j = 0; j < v.yLength; j++)
+                    v.vMatrix[i, j] += n;
+        }
+        public static Matrix Add(Matrix v1, Matrix v2)
+        {
+            if (v1.xLength != v2.xLength || v1.yLength != v2.yLength)
+                throw new Exception("无法将矩阵相加");
+            Matrix re = new Matrix(v1.xLength, v1.yLength, 0);
+            for (int i = 0; i < v1.xLength; i++)
+                for (int j = 0; j < v1.yLength; j++)
+                    re.vMatrix[i,j] =v1.vMatrix[i, j] + v2.vMatrix[i, j];
+            return re;
+        }
+        public static Matrix Add( Matrix v, float n)
+        {
+            Matrix re = new Matrix(v.xLength, v.yLength, 0);
+            for (int i = 0; i < re.xLength; i++)
+                for (int j = 0; j < re.yLength; j++)
+                    re.vMatrix[i, j] = n + v.vMatrix[i,j];
+            return re;
         }
         public static float AddAll(Matrix lhs)
         {
@@ -216,24 +279,54 @@ namespace matrix
                 sum += item;
             return sum;
         }
-        public static void Sub(ref Matrix lhs, Matrix rhs)
+
+        public static void Sub(ref Matrix m, Matrix v)
         {
-            if (lhs.xLength != rhs.xLength || lhs.yLength != rhs.yLength)
+            if (m.xLength != v.xLength || m.yLength != v.yLength)
                 throw new Exception("无法将矩阵相减");
-            for (int i = 0; i < lhs.xLength; i++)
-                for (int j = 0; j < lhs.yLength; j++)
-                    lhs.vMatrix[i, j] -= rhs.vMatrix[i, j];
+            for (int i = 0; i < m.xLength; i++)
+                for (int j = 0; j < m.yLength; j++)
+                    m.vMatrix[i, j] -= v.vMatrix[i, j];
         }
-        public static void Sub(ref Matrix lhs, float rhs)
+        public static void Sub(ref Matrix v, float n)
         {
-            for (int i = 0; i < lhs.xLength; i++)
-                for (int j = 0; j < lhs.yLength; j++)
-                    lhs.vMatrix[i, j] -= rhs;
+            for (int i = 0; i < v.xLength; i++)
+                for (int j = 0; j < v.yLength; j++)
+                    v.vMatrix[i, j] -= n;
         }
+        public static Matrix Sub(Matrix v1, Matrix v2)
+        {
+            if (v1.xLength != v2.xLength || v1.yLength != v2.yLength)
+                throw new Exception("无法将矩阵相加");
+            Matrix re = new Matrix(v1.xLength, v1.yLength, 0);
+            for (int i = 0; i < v1.xLength; i++)
+                for (int j = 0; j < v1.yLength; j++)
+                    re.vMatrix[i, j] = v1.vMatrix[i, j] - v2.vMatrix[i, j];
+            return re;
+        }
+        public static Matrix Sub(Matrix v, float n)
+        {
+            Matrix re = new Matrix(v.xLength, v.yLength, 0);
+            for (int i = 0; i < re.xLength; i++)
+                for (int j = 0; j < re.yLength; j++)
+                    re.vMatrix[i, j] = v.vMatrix[i, j] - n;
+            return re;
+        }
+
         public static void Power(ref Matrix v, float n)
         {
             v.Foreach(a => { return (float)Math.Pow((double)a, (double)n); });
         }
+        public static Matrix Power(Matrix v, float n)
+        {
+            Matrix re = new Matrix(v.xLength, v.yLength, 0);
+            for (int i = 0; i < v.xLength; i++)
+                for (int j = 0; j < v.yLength; j++)
+                    re.vMatrix[i, j] = v.vMatrix[i, j];
+            re.Foreach(a => { return (float)Math.Pow(a, n); });
+            return re;
+        }
+
         public static Matrix Range(int x, int y)
         {
             Matrix re = new Matrix(x, y, 0);
