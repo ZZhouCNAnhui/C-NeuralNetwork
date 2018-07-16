@@ -168,7 +168,7 @@ namespace NeuralNetwork
     /// <typeparam name="LayerWB">神经网络中权重和偏置的类型,现只支持Matrix</typeparam>
     public class Network<Tensor, LayerWB> where Tensor : Matrix where LayerWB : Matrix
     {
-        private Dictionary<string, Layer<Tensor, LayerWB>> Structure;
+        public Dictionary<string, Layer<Tensor, LayerWB>> Structure;
 
         private Constant<Tensor, LayerWB> Input;
         private Constant<Tensor, LayerWB> Output;
@@ -230,6 +230,21 @@ namespace NeuralNetwork
             }
             return data;
         }
+        public List<Tensor> RunNetwork_s(Tensor T)
+        {
+            List<Tensor> datas = new List<Tensor>() { T};
+            string link = "Input";
+            for (int i = 0; i < Structure.Count; i++)
+            {
+                Layer<Tensor, LayerWB> layer = Structure[link];
+                datas.Add(layer.Function(datas[i]));
+                link = layer.LinkLayerName;
+            }
+            datas.Remove(T);
+
+            return datas;
+        }
+
 
         public Tensor RunForVariable(Tensor T, int LayerNumber)
         {
@@ -263,73 +278,62 @@ namespace NeuralNetwork
         /// </summary>
         /// <param name="XData">输入数据</param>
         /// <param name="YData">输出数据</param>
+        /// <param name="learn">学习效率</param>
         /// <param name="isShow">是否显示过程</param>
-        public void Train(Tensor XData, Tensor YData, float learn=0.05f,bool isShow = true)
+        public void GradientDescent(Tensor XData, Tensor YData, float learn=0.001f,bool isShow = true)
         {
-            List<Tensor> tensors = new List<Tensor>() { XData };
-            string link = "Input";
-            for (int i = 0; i < Structure.Count; i++)
+            var outputs = RunNetwork_s(XData);
+            var dloss = (outputs[outputs.Count - 1] - YData) * 2;
+            if (isShow)
+                Console.WriteLine(Function.Power(outputs[outputs.Count-1]-YData,2));
+            for (int i = Structure.Count - 2; i >= 0; i--)
             {
-                Layer<Tensor, LayerWB> layer = Structure[link];
-                tensors.Add(layer.Function(tensors[i]));
-                link = layer.LinkLayerName;
-            }
-            Matrix Out = tensors[tensors.Count - 1];
-            Function.Sub(ref Out, YData);
-            Function.Power(ref Out, 2);
-            float loss = Function.Mean(Out);
-            Console.WriteLine("loss:" + loss);
-
-
-            Matrix pian = tensors[tensors.Count - 1];
-            Function.Sub(ref pian, YData);
-            Function.Multiply(ref pian, 2);
-            
-            for (int i = Structure.Count-2; i >= 0; i--)
-            {
-                Layer<Tensor, LayerWB> thislayaer = FindLayerBynum(i);
-                if (thislayaer.Name == "Input")
+                var thislayer = FindLayerBynum(i);
+                if (thislayer.Name == "Input")
                     break;
-                Layer<Tensor, LayerWB> lastlayaer = FindLayerBynum(i-1);
-                Tensor Dzl = tensors[i-1];
-                Tensor Dlayer = Dzl;
-
-                Dzl = thislayaer.FunctionNoAF(Dzl);
-                if (thislayaer.ActivationFunction != null)
-                    Dzl.Derivatives(FindLayerBynum(i).ActivationFunction);
+                var Lastlayer = FindLayerBynum(i-1);
+                Matrix thislayerW = thislayer.Weight;
+                Matrix thislayerB = thislayer.Bias;
+                Matrix lastlayerOut = outputs[i - 1];
+                Matrix thislayerlz = thislayer.FunctionNoAF((Tensor)lastlayerOut);
+                if (thislayer.ActivationFunction != null)
+                    thislayerlz.Derivatives(thislayer.ActivationFunction);
                 else
-                    Dzl.Foreach(a => { return 1; });
+                    thislayerlz.Foreach(a => { return 1; });
 
-                LayerWB dw = thislayaer.Weight;
+                thislayerW -= (dloss * lastlayerOut *thislayerlz) * learn;
+                thislayerB -= (dloss * thislayerlz) * learn;
+                dloss = dloss * thislayerlz * thislayer.Weight * learn*2;
 
-                Matrix offset_w = pian;
-                Function.Multiply(ref offset_w, Dzl);
-                Function.Multiply(ref offset_w, Dlayer);
-
-                Matrix offset_b = pian;
-                Function.Multiply(ref offset_b, Dzl);
-
-                Matrix offset_ll = offset_b;
-                offset_ll = dw * offset_ll;
-
-                Function.Multiply(ref offset_w, learn);
-                Function.Multiply(ref offset_b, learn);
-                Function.Multiply(ref offset_ll, learn);
-
-                Matrix w = thislayaer.Weight;
-                Matrix b = thislayaer.Bias;
-                Matrix ll = tensors[i-1];
-
-                Function.Sub(ref w, offset_w);
-                Function.Sub(ref b, offset_b);
-                Function.Sub(ref ll, offset_ll);
-
-                thislayaer.Weight = (LayerWB)w;
-                thislayaer.Bias = (LayerWB)b;
-                Function.Multiply(ref ll, 2);
-                pian = ll;
+                thislayer.Weight = (LayerWB)thislayerW;
+                thislayer.Bias = (LayerWB)thislayerB;
             }
 
+        }
+
+        public void Train_fortest(Tensor XData, Tensor YData)
+        {
+            var outputs = RunNetwork_s(XData);
+            Matrix dloss = (outputs[outputs.Count-1] - YData) * 2;
+           // Console.WriteLine(Function.Power(outputs[outputs.Count - 1] - YData,2));
+            Layer<Tensor, LayerWB> l1 = FindLayerBynum(1);
+            Layer<Tensor, LayerWB> l2 = FindLayerBynum(2);
+
+            Matrix l1w = l1.Weight;
+            Matrix l1b = l1.Bias;
+            Matrix l2w = l2.Weight;
+            Matrix l2b = l2.Bias;
+            Matrix dloss_l1 =  ( l1w * dloss)*0.001f;
+
+            l2w -= (dloss * outputs[outputs.Count - 3]) * 0.001f;
+            l2b -= dloss * 0.001f;
+            l1w -= (dloss_l1 * XData) * 0.001f;
+            l1b -= dloss_l1 * 0.001f;
+
+            l2.Weight = (LayerWB)l2w;
+            l2.Bias = (LayerWB)l2b;
+            l1.Weight = (LayerWB)l1w;
+            l1.Bias = (LayerWB)l1b;
         }
 
         public override string ToString()

@@ -154,6 +154,24 @@ namespace matrix
                 }
             }
         }
+        public static Matrix operator -(Matrix lhs, float rhs)
+        {
+            Matrix re = new Matrix(lhs.xLength, lhs.yLength, 0);
+            for (int i = 0; i < re.xLength; i++)
+                for (int j = 0; j < re.yLength; j++)
+                    re.matrix[i, j] = lhs.vMatrix[i, j] - rhs;
+            return re;
+        }
+        public static Matrix operator -(Matrix lhs, Matrix rhs)
+        {
+            if (lhs.yLength != rhs.yLength || rhs.xLength != lhs.xLength)
+                throw new Exception("无法将矩阵相减");
+            Matrix re = new Matrix(rhs.xLength, rhs.yLength, 0);
+            for (int i = 0; i < re.xLength; i++)
+                for (int j = 0; j < re.yLength; j++)
+                    re.matrix[i, j] = lhs.vMatrix[i, j] - rhs.matrix[i, j];
+            return re;
+        }
         public static Matrix operator +(Matrix lhs, Matrix rhs)
         {
             if (lhs.yLength != rhs.yLength || rhs.xLength != 1)
