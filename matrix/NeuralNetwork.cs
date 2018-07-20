@@ -6,12 +6,46 @@ using System.Threading.Tasks;
 
 namespace NeuralNetwork
 {
+
+    using Layers;
     using matrix;
     using ActivationFunctions;
 
     namespace Layers
     {
-        using NeuralNetwork;
+
+        public abstract class Layer<IO, WB>
+        {
+            public Layer(string Name, AF af)
+            {
+                this.Name = Name;
+                this.ActivationFunction = af;
+            }
+            public int LayerNumber;
+            public AF ActivationFunction;
+            public WB Weight;
+            public WB Bias;
+            public abstract IO Function(IO input);
+            public abstract IO FunctionNoAF(IO input);
+            public string Name;
+            public string LinkLayerName;
+
+        }
+
+        public class Constant<T1, T2> : Layer<T1, T2>
+        {
+            public Constant(string Name) : base(Name, null) { }
+
+            public override T1 Function(T1 input)
+            {
+                return input;
+            }
+
+            public override T1 FunctionNoAF(T1 input)
+            {
+                return input;
+            }
+        }
 
         /// <summary>
         /// 默认的神经层，使用矩阵
@@ -51,35 +85,7 @@ namespace NeuralNetwork
                 return M;
             }
         }
-
-        /// <summary>
-        /// 默认的神经层的缩小，使用单个数
-        /// </summary>
-        public class SmallDenes : Layer<Matrix, float>
-        {
-            Random r = new Random();
-            public SmallDenes(string Name, AF af = null) : base(Name, af)
-            {
-                Weight = (float)r.NextDouble();
-                Bias = 0;
-
-            }
-            public override Matrix Function(Matrix input)
-            {
-                Matrix ou = input;
-                matrix.Function.Multiply(ref ou, Weight);
-                matrix.Function.Add(ref ou, Bias);
-                return ou;
-            }
-
-            public override Matrix FunctionNoAF(Matrix input)
-            {
-                Matrix ou = input;
-                matrix.Function.Multiply(ref ou, Weight);
-                matrix.Function.Add(ref ou, Bias);
-                return ou;
-            }
-        }
+        
 
     }
 
@@ -127,39 +133,6 @@ namespace NeuralNetwork
     }
 
 
-    public abstract class Layer<IO, WB>
-    {
-        public Layer(string Name, AF af)
-        {
-            this.Name = Name;
-            this.ActivationFunction = af;
-        }
-        public int LayerNumber;
-        public AF ActivationFunction;
-        public WB Weight;
-        public WB Bias;
-        public abstract IO Function(IO input);
-        public abstract IO FunctionNoAF(IO input);
-        public string Name;
-        public string LinkLayerName;
-
-    }
-
-
-    public class Constant<T1, T2> : Layer<T1, T2>
-    {
-        public Constant(string Name) : base(Name, null) { }
-
-        public override T1 Function(T1 input)
-        {
-            return input;
-        }
-
-        public override T1 FunctionNoAF(T1 input)
-        {
-            return input;
-        }
-    }
 
     /// <summary>
     /// 神经网络
@@ -279,19 +252,20 @@ namespace NeuralNetwork
         /// <param name="XData">输入数据</param>
         /// <param name="YData">输出数据</param>
         /// <param name="learn">学习效率</param>
-        /// <param name="isShow">是否显示过程</param>
+        /// <param name="isShow">是否显示误差</param>
         public void GradientDescent(Tensor XData, Tensor YData, float learn=0.001f,bool isShow = true)
         {
             var outputs = RunNetwork_s(XData);
             var dloss = (outputs[outputs.Count - 1] - YData) * 2;
             if (isShow)
-                Console.WriteLine(Function.Power(outputs[outputs.Count-1]-YData,2));
+                Console.WriteLine("[loss]:"+Function.Mean(Function.Power(outputs[outputs.Count-1]-YData,2)));
             for (int i = Structure.Count - 2; i >= 0; i--)
             {
                 var thislayer = FindLayerBynum(i);
                 if (thislayer.Name == "Input")
                     break;
                 var Lastlayer = FindLayerBynum(i-1);
+
                 Matrix thislayerW = thislayer.Weight;
                 Matrix thislayerB = thislayer.Bias;
                 Matrix lastlayerOut = outputs[i - 1];
@@ -301,40 +275,77 @@ namespace NeuralNetwork
                 else
                     thislayerlz.Foreach(a => { return 1; });
 
-                thislayerW -= (dloss * lastlayerOut *thislayerlz) * learn;
-                thislayerB -= (dloss * thislayerlz) * learn;
-                dloss = dloss * thislayerlz * thislayer.Weight * learn*2;
+                Matrix dloss_m = new Matrix(lastlayerOut.xLength, thislayerW.xLength,0);
+                for (int k = 0; k < thislayerW.xLength; k++)
+                {
+                    for (int j = 0; j < thislayerW.yLength; j++)
+                    {
+                        //float wjk = thislayerW.vMatrix[k, j];
+                        //float bj = thislayerB.vMatrix[0, j];
+                        Matrix d_cost = dloss[-1, j];
+                        Matrix d_layer = lastlayerOut[-1, k];
+                        Matrix d_zl = thislayerlz[-1, j];
+                        //Console.WriteLine("d_cost:" + d_cost.Shape);
+                        //Console.WriteLine("d_layer:" + d_layer.Shape);
+                        //Console.WriteLine("d_zl:" + d_zl.Shape);
+
+
+                        Matrix offset_w_M = Function.Multiply(d_cost, d_layer);
+                        offset_w_M = Function.Multiply(offset_w_M, d_zl);
+                        float offset_w = Function.AddAll(offset_w_M) * learn;
+                        //thislayerW.vMatrix[k, j] -= offset_w;
+
+                        Matrix offset_b_M = Function.Multiply(d_cost, d_zl);
+                        float offset_b = Function.AddAll(offset_b_M) * learn;
+
+                        Matrix offset_ll_M = Function.Multiply(d_cost, d_zl);
+                        offset_ll_M = Function.Multiply(offset_ll_M, thislayerW.vMatrix[k, j]);
+                        Matrix offset_ll = offset_b_M * learn * 2;
+
+                        thislayerW.vMatrix[k, j] -= offset_w;
+                        thislayerB.vMatrix[0,j] -= offset_b;
+                        dloss_m[-1,k] = offset_ll;
+                    }
+                }
+
+
+                //thislayerW -= (dloss * lastlayerOut *thislayerlz) * learn;
+                //thislayerB -= (dloss * thislayerlz) * learn;
+                //dloss = dloss * thislayerlz * thislayer.Weight * learn*2;
 
                 thislayer.Weight = (LayerWB)thislayerW;
                 thislayer.Bias = (LayerWB)thislayerB;
+                dloss = dloss_m;
             }
 
         }
 
-        public void Train_fortest(Tensor XData, Tensor YData)
-        {
-            var outputs = RunNetwork_s(XData);
-            Matrix dloss = (outputs[outputs.Count-1] - YData) * 2;
-           // Console.WriteLine(Function.Power(outputs[outputs.Count - 1] - YData,2));
-            Layer<Tensor, LayerWB> l1 = FindLayerBynum(1);
-            Layer<Tensor, LayerWB> l2 = FindLayerBynum(2);
+        #region
+        //public void Train_fortest(Tensor XData, Tensor YData)
+        //{
+        //    var outputs = RunNetwork_s(XData);
+        //    Matrix dloss = (outputs[outputs.Count-1] - YData) * 2;
+        //   // Console.WriteLine(Function.Power(outputs[outputs.Count - 1] - YData,2));
+        //    Layer<Tensor, LayerWB> l1 = FindLayerBynum(1);
+        //    Layer<Tensor, LayerWB> l2 = FindLayerBynum(2);
 
-            Matrix l1w = l1.Weight;
-            Matrix l1b = l1.Bias;
-            Matrix l2w = l2.Weight;
-            Matrix l2b = l2.Bias;
-            Matrix dloss_l1 =  ( l1w * dloss)*0.001f;
+        //    Matrix l1w = l1.Weight;
+        //    Matrix l1b = l1.Bias;
+        //    Matrix l2w = l2.Weight;
+        //    Matrix l2b = l2.Bias;
+        //    Matrix dloss_l1 =  ( l1w * dloss)*0.001f;
 
-            l2w -= (dloss * outputs[outputs.Count - 3]) * 0.001f;
-            l2b -= dloss * 0.001f;
-            l1w -= (dloss_l1 * XData) * 0.001f;
-            l1b -= dloss_l1 * 0.001f;
+        //    l2w -= (dloss * outputs[outputs.Count - 3]) * 0.001f;
+        //    l2b -= dloss * 0.001f;
+        //    l1w -= (dloss_l1 * XData) * 0.001f;
+        //    l1b -= dloss_l1 * 0.001f;
 
-            l2.Weight = (LayerWB)l2w;
-            l2.Bias = (LayerWB)l2b;
-            l1.Weight = (LayerWB)l1w;
-            l1.Bias = (LayerWB)l1b;
-        }
+        //    l2.Weight = (LayerWB)l2w;
+        //    l2.Bias = (LayerWB)l2b;
+        //    l1.Weight = (LayerWB)l1w;
+        //    l1.Bias = (LayerWB)l1b;
+        //}
+        #endregion
 
         public override string ToString()
         {

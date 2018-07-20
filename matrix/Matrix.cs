@@ -176,7 +176,7 @@ namespace matrix
         {
             if (lhs.yLength != rhs.yLength || rhs.xLength != 1)
                 throw new Exception("无法将矩阵相加");
-            Matrix re = new Matrix(rhs.xLength, rhs.yLength,0);
+            Matrix re = new Matrix(lhs.xLength, lhs.yLength,0);
             for (int i = 0; i < re.xLength; i++)
                 for (int j = 0; j < re.yLength; j++)
                     re.matrix[i, j] = rhs.matrix[0, j]+lhs.vMatrix[i,j];
